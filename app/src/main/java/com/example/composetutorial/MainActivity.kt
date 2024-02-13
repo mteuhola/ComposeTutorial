@@ -22,7 +22,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.example.composetutorial.ui.theme.ComposeTutorialTheme
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import android.content.res.Configuration
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,7 +33,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -44,24 +42,30 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.room.Room
+import coil.compose.AsyncImage
 
 object SampleData {
     // Sample conversation data
     val conversationSample = listOf(
         Message(
-            "monke",
+            "Username",
             "Test...Test...Test..."
         ),
         Message(
-            "monke",
+            "Username",
             """List of Android versions:
             |Android KitKat (API 19)
             |Android Lollipop (API 21)
@@ -74,51 +78,51 @@ object SampleData {
             |Android 12 (API 31)""".trim()
         ),
         Message(
-            "monke",
+            "Username",
             """I think Kotlin is my favorite programming language.
             |It's so much fun!""".trim()
         ),
         Message(
-            "monke",
+            "Username",
             "Searching for alternatives to XML layouts..."
         ),
         Message(
-            "monke",
+            "Username",
             """Hey, take a look at Jetpack Compose, it's great!
             |It's the Android's modern toolkit for building native UI.
             |It simplifies and accelerates UI development on Android.
             |Less code, powerful tools, and intuitive Kotlin APIs :)""".trim()
         ),
         Message(
-            "monke",
+            "Username",
             "It's available from API 21+ :)"
         ),
         Message(
-            "monke",
+            "Username",
             "Writing Kotlin for UI seems so natural, Compose where have you been all my life?"
         ),
         Message(
-            "monke",
+            "Username",
             "Android Studio next version's name is Arctic Fox"
         ),
         Message(
-            "monke",
+            "Username",
             "Android Studio Arctic Fox tooling for Compose is top notch ^_^"
         ),
         Message(
-            "monke",
+            "Username",
             "I didn't know you can now run the emulator directly from Android Studio"
         ),
         Message(
-            "monke",
+            "Username",
             "Compose Previews are great to check quickly how a composable layout looks like"
         ),
         Message(
-            "monke",
+            "Username",
             "Previews are also interactive after enabling the experimental setting"
         ),
         Message(
-            "monke",
+            "Username",
             "Have you tried writing build.gradle with KTS?"
         ),
     )
@@ -186,7 +190,20 @@ fun Navigation() {
  }
 
 @Composable
-fun SettingsScreen(navController: NavController) {
+fun SettingsScreen(
+    navController: NavController) {
+    var text by remember {
+        mutableStateOf("Username")
+    }
+    var uri by remember {
+        mutableStateOf<Uri?>(null)
+    }
+
+    val singlePhotoPick = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = {
+            uri = it
+        })
     Row {
         IconButton(onClick = {
             navController.navigate(Screen.MainScreen.route) {
@@ -200,18 +217,37 @@ fun SettingsScreen(navController: NavController) {
                 contentDescription = "Return to main screen")
         }
     }
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier.fillMaxSize()
-    ) {
-        Text(text = "Go back now, nothing to see here")
+    Row (modifier = Modifier
+        .padding(horizontal = 10.dp)
+        .padding(vertical = 50.dp)) {
+        AsyncImage(
+            model = uri,
+            contentDescription = null,
+            error = painterResource(R.drawable.defaultti),
+            modifier = Modifier
+                .clickable {
+                    singlePhotoPick.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                }
+                .size(100.dp)
+                .clip(CircleShape)
+                .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape))
+    }
+
+    Row (modifier = Modifier
+        .padding(horizontal = 10.dp)
+        .padding(vertical = 160.dp)){
+        TextField(value = text, onValueChange = {
+            text = it
+        })
     }
 }
 
 @Composable
 fun MessageCard(msg: Message) {
     Row(modifier = Modifier.padding(all = 8.dp)) {
-        Image(painter = painterResource(R.drawable.funky),
+        Image(painter = painterResource(R.drawable.defaultti),
             contentDescription = "Contact profile picture",
             modifier = Modifier
                 .size(40.dp)
@@ -263,7 +299,7 @@ fun PreviewMessageCard() {
     ComposeTutorialTheme {
         Surface {
             MessageCard(
-                msg = Message("monke", "Wow I love creating apps!")
+                msg = Message("Username", "Wow I love creating apps!")
             )
         }
     }
@@ -288,7 +324,6 @@ fun PreviewConversation() {
 
 @Composable
 fun ScrollContent(innerPadding: PaddingValues) {
-
     ComposeTutorialTheme {
         Conversation(SampleData.conversationSample)
     }
