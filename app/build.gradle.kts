@@ -1,7 +1,8 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("com.google.devtools.ksp") version "1.9.22-1.0.17" apply true
+    id("kotlin-kapt")
+    id("dagger.hilt.android.plugin")
 }
 
 android {
@@ -49,7 +50,7 @@ android {
 
 dependencies {
     val nav_version = "2.7.6"
-    val room_version = "2.6.1"
+    val lifecycle_version = "2.6.0-alpha05"
 
     implementation("io.coil-kt:coil-compose:2.3.0")
     implementation("androidx.core:core-ktx:1.12.0")
@@ -81,6 +82,16 @@ dependencies {
     // Jetpack Compose Integration
     implementation("androidx.navigation:navigation-compose:$nav_version")
 
-    implementation("androidx.room:room-runtime:$room_version")
-    annotationProcessor("androidx.room:room-compiler:$room_version")
+    // Dependency Injection
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycle_version")
+
+    implementation("com.google.dagger:hilt-android:2.48")
+    kapt("com.google.dagger:hilt-android-compiler:2.48")
+
+    kapt("androidx.hilt:hilt-compiler:1.1.0")
+
+}
+
+hilt {
+    enableAggregatingTask = true
 }

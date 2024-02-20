@@ -54,8 +54,13 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.room.Room
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.Button
+import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import dagger.hilt.android.AndroidEntryPoint
 
 object SampleData {
     // Sample conversation data
@@ -128,26 +133,35 @@ object SampleData {
     )
 }
 
+data class Message(val author: String, val body: String)
+
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            Navigation()
+            /*val postNotificationPermission =*/
+
+            val tempNotificationService = TempNotificationService(this)
+            Navigation(tempNotificationService)
+            }
         }
     }
-}
-
-data class Message(val author: String, val body: String)
 
 @Composable
-fun Navigation() {
+fun Navigation(tempNotificationService: TempNotificationService) {
     val navController = rememberNavController()
+    val viewModel = viewModel<MainViewModel>()
+    val isHot = viewModel.isHot
+    if (isHot) {
+        tempNotificationService.showBasicNotification()
+    }
     NavHost(navController = navController, startDestination = Screen.MainScreen.route) {
         composable(route = Screen.MainScreen.route) {
             MainScreen(navController = navController)
         }
         composable(route = Screen.SettingsScreen.route) {
-            SettingsScreen(navController = navController)
+            SettingsScreen(navController = navController, isHot = isHot)
         }
     }
 }
@@ -189,9 +203,12 @@ fun Navigation() {
      }
  }
 
+
 @Composable
 fun SettingsScreen(
-    navController: NavController) {
+    navController: NavController,
+    isHot: Boolean
+    ) {
     var text by remember {
         mutableStateOf("Username")
     }
@@ -203,6 +220,7 @@ fun SettingsScreen(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = {
             uri = it
+
         })
     Row {
         IconButton(onClick = {
@@ -241,6 +259,24 @@ fun SettingsScreen(
         TextField(value = text, onValueChange = {
             text = it
         })
+
+    }
+    Row {
+        Box (
+            modifier = Modifier
+                .padding(horizontal = 120.dp)
+                .padding(vertical = 240.dp)
+                .background(if (!isHot) Color.Blue else Color.Red)
+                .width(400.dp)
+                .height(50.dp)
+                ) {
+                    Text(text = if(isHot) "Oh boy it's hot" else "Normal temp",
+                        color = Color.White,
+                        modifier = Modifier
+                            .padding(horizontal = 30.dp)
+                            .padding(vertical = 15.dp)
+            )
+        }
     }
 }
 
@@ -255,7 +291,7 @@ fun MessageCard(msg: Message) {
                 .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape))
 
         var isExpanded by remember { mutableStateOf(false) }
-        
+
         Spacer(modifier = Modifier.width(8.dp))
 
         val surfaceColor by animateColorAsState(
