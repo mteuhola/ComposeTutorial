@@ -400,7 +400,8 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-            ){
+            ){values ->
+                PaddingContent(innerPadding = values)
 
             }
         }
@@ -705,6 +706,10 @@ class MainActivity : ComponentActivity() {
         ComposeTutorialTheme {
             Conversation(SampleData.conversationSample)
         }
+    }
+
+    @Composable
+    fun PaddingContent(innerPadding: PaddingValues) {
     }
 }
 
