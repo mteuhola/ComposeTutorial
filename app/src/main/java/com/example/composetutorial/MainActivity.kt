@@ -1,5 +1,8 @@
 package com.example.composetutorial
 
+import android.Manifest
+import android.animation.ObjectAnimator
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -24,6 +27,8 @@ import com.example.composetutorial.ui.theme.ComposeTutorialTheme
 import androidx.compose.foundation.border
 import androidx.compose.material3.MaterialTheme
 import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
@@ -37,30 +42,68 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import android.net.Uri
+import android.util.Log
+import android.view.View
+import android.view.animation.OvershootInterpolator
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
+import androidx.activity.viewModels
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture.OnImageCapturedCallback
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.ImageProxy
+import androidx.camera.view.CameraController
+import androidx.camera.view.LifecycleCameraController
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.material3.Button
-import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Cameraswitch
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Photo
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.AddCircle
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.BottomSheetScaffold
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberBottomSheetScaffoldState
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.animation.doOnEnd
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 
 object SampleData {
     // Sample conversation data
@@ -133,234 +176,535 @@ object SampleData {
     )
 }
 
+data class BottomNavigationItem(
+    val title: String,
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector,
+    val hasNews: Boolean,
+    val badgeCount: Int? = null
+)
+
 data class Message(val author: String, val body: String)
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    private val viewModel by viewModels<SplashViewModel>()
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        installSplashScreen().apply {
+            setKeepOnScreenCondition {
+                !viewModel.isReady.value
+            }
+            setOnExitAnimationListener { screen ->
+                val zoomX = ObjectAnimator.ofFloat(
+                    screen.iconView,
+                    View.SCALE_X,
+                    0.4f, 0.0f
+                )
+                zoomX.interpolator = OvershootInterpolator()
+                zoomX.duration = 500L
+                zoomX.doOnEnd {screen.remove()}
+
+                val zoomY = ObjectAnimator.ofFloat(
+                    screen.iconView,
+                    View.SCALE_Y,
+                    0.4f, 0.0f
+                )
+                zoomY.interpolator = OvershootInterpolator()
+                zoomY.duration = 500L
+                zoomY.doOnEnd {screen.remove()}
+
+                zoomX.start()
+                zoomY.start()
+            }
+        }
         setContent {
-            /*val postNotificationPermission =*/
-
-            val tempNotificationService = TempNotificationService(this)
-            Navigation(tempNotificationService)
-            }
+            Navigation()
         }
     }
-
-@Composable
-fun Navigation(tempNotificationService: TempNotificationService) {
-    val navController = rememberNavController()
-    val viewModel = viewModel<MainViewModel>()
-    val isHot = viewModel.isHot
-    if (isHot) {
-        tempNotificationService.showBasicNotification()
-    }
-    NavHost(navController = navController, startDestination = Screen.MainScreen.route) {
-        composable(route = Screen.MainScreen.route) {
-            MainScreen(navController = navController)
-        }
-        composable(route = Screen.SettingsScreen.route) {
-            SettingsScreen(navController = navController, isHot = isHot)
-        }
-    }
-}
-
- @OptIn(ExperimentalMaterial3Api::class)
- @Composable
- fun MainScreen(navController: NavController) {
-     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
-     Scaffold (
-         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-         topBar = {
-             CenterAlignedTopAppBar(
-                 colors = TopAppBarDefaults.topAppBarColors(
-                     containerColor = MaterialTheme.colorScheme.primaryContainer,
-                     titleContentColor = MaterialTheme.colorScheme.primary,
-                 ),
-                 title = {
-                     Text(
-                         "Test Top Bar",
-                         maxLines = 1,
-                     )
-                 },
-                 actions = {
-                     IconButton(onClick = {
-                         navController.navigate(Screen.SettingsScreen.route)
-                     }) {
-                         Icon(
-                             imageVector = Icons.Default.Settings,
-                             contentDescription = "Settings"
-                         )
-                     }
-                 },
-                 scrollBehavior = scrollBehavior,
-             )
-         }
-     )
-     {values ->
-        ScrollContent(innerPadding = values)
-     }
- }
-
-
-@Composable
-fun SettingsScreen(
-    navController: NavController,
-    isHot: Boolean
+    private fun takePhoto(
+        controller: LifecycleCameraController,
+        onPhotoTaken: (Bitmap) -> Unit
     ) {
-    var text by remember {
-        mutableStateOf("Username")
-    }
-    var uri by remember {
-        mutableStateOf<Uri?>(null)
-    }
+        controller.takePicture(
+            ContextCompat.getMainExecutor(applicationContext),
+            object : OnImageCapturedCallback() {
+                override fun onCaptureSuccess(image: ImageProxy) {
+                    super.onCaptureSuccess(image)
 
-    val singlePhotoPick = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-        onResult = {
-            uri = it
+                    val matrix = Matrix().apply {
+                        postRotate(image.imageInfo.rotationDegrees.toFloat())
+                    }
+                    val rotatedBitmap = Bitmap.createBitmap(
+                        image.toBitmap(),
+                        0,
+                        0,
+                        image.width,
+                        image.height,
+                        matrix,
+                        true
+                    )
 
-        })
-    Row {
-        IconButton(onClick = {
-            navController.navigate(Screen.MainScreen.route) {
-                popUpTo(Screen.MainScreen.route) {
-                    inclusive = true
+                    onPhotoTaken(rotatedBitmap)
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    super.onError(exception)
+                    Log.e("Camera", "Couldn't take photo: ", exception)
                 }
             }
-        }) {
-            Icon(
-                imageVector = Icons.Default.ArrowBack,
-                contentDescription = "Return to main screen")
-        }
-    }
-    Row (modifier = Modifier
-        .padding(horizontal = 10.dp)
-        .padding(vertical = 50.dp)) {
-        AsyncImage(
-            model = uri,
-            contentDescription = null,
-            error = painterResource(R.drawable.defaultti),
-            modifier = Modifier
-                .clickable {
-                    singlePhotoPick.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
-                }
-                .size(100.dp)
-                .clip(CircleShape)
-                .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape))
-    }
-
-    Row (modifier = Modifier
-        .padding(horizontal = 10.dp)
-        .padding(vertical = 160.dp)){
-        TextField(value = text, onValueChange = {
-            text = it
-        })
-
-    }
-    Row {
-        Box (
-            modifier = Modifier
-                .padding(horizontal = 120.dp)
-                .padding(vertical = 240.dp)
-                .background(if (!isHot) Color.Blue else Color.Red)
-                .width(400.dp)
-                .height(50.dp)
-                ) {
-                    Text(text = if(isHot) "Oh boy it's hot" else "Normal temp",
-                        color = Color.White,
-                        modifier = Modifier
-                            .padding(horizontal = 30.dp)
-                            .padding(vertical = 15.dp)
-            )
-        }
-    }
-}
-
-@Composable
-fun MessageCard(msg: Message) {
-    Row(modifier = Modifier.padding(all = 8.dp)) {
-        Image(painter = painterResource(R.drawable.defaultti),
-            contentDescription = "Contact profile picture",
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape))
-
-        var isExpanded by remember { mutableStateOf(false) }
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        val surfaceColor by animateColorAsState(
-            if (isExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-            label = "pressed",
         )
+    }
 
-        Column(modifier = Modifier.clickable { isExpanded = !isExpanded }) {
+    private fun hasRequiredPermissions(): Boolean {
+        return CAMERAX_PERMISSIONS.all {
+            ContextCompat.checkSelfPermission(
+                applicationContext,
+                it
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    companion object {
+        private val CAMERAX_PERMISSIONS = arrayOf(
+            Manifest.permission.CAMERA,
+        )
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun Navigation() {
+
+        val navController = rememberNavController()
+        BottomNavigationBar(navController = navController)
+        NavHost(navController = navController, startDestination = Screen.MainScreen.route) {
+            composable(route = Screen.MainScreen.route) {
+                MainScreen(navController = navController)
+            }
+            composable(route = Screen.SearchScreen.route) {
+                SearchScreen(navController = navController)
+            }
+            composable(route = Screen.NewPostScreen.route) {
+                NewPostScreen(navController = navController)
+            }
+            composable(route = Screen.CameraScreen.route) {
+                CameraScreen(navController = navController)
+            }
+            composable(route = Screen.ShoppingListScreen.route) {
+                ShoppingListScreen(navController = navController)
+            }
+            composable(route = Screen.ProfileScreen.route) {
+                ProfileScreen(navController = navController)
+            }
+            composable(route = Screen.SettingsScreen.route) {
+                SettingsScreen(navController = navController)
+            }
+        }
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun BottomNavigationBar(navController: NavController) {
+        val items = listOf(
+            BottomNavigationItem(
+                title = "Home",
+                selectedIcon = Icons.Filled.Home,
+                unselectedIcon = Icons.Outlined.Home,
+                hasNews = false,
+            ),
+            BottomNavigationItem(
+                title = "Search",
+                selectedIcon = Icons.Filled.Search,
+                unselectedIcon = Icons.Outlined.Search,
+                hasNews = false,
+            ),
+            BottomNavigationItem(
+                title = "New Post",
+                selectedIcon = Icons.Filled.AddCircle,
+                unselectedIcon = Icons.Outlined.AddCircle,
+                hasNews = false,
+            ),
+            BottomNavigationItem(
+                title = "Shopping List",
+                selectedIcon = Icons.Filled.ShoppingCart,
+                unselectedIcon = Icons.Outlined.ShoppingCart,
+                hasNews = false,
+                badgeCount = 10,
+            ),
+            BottomNavigationItem(
+                title = "Profile",
+                selectedIcon = Icons.Filled.AccountCircle,
+                unselectedIcon = Icons.Outlined.AccountCircle,
+                hasNews = false,
+            ),
+        )
+        var selectedItemIndex by rememberSaveable {
+            mutableStateOf(0)
+        }
+
+        Surface (
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ){
+            Scaffold (
+                bottomBar = {
+                    NavigationBar {
+                        items.forEachIndexed{ index, item ->
+                            NavigationBarItem(
+                                selected = selectedItemIndex == index,
+                                onClick = {
+                                    selectedItemIndex = index
+                                    when (index) {
+                                        0 -> navController.navigate(Screen.MainScreen.route) {
+                                            popUpTo(Screen.MainScreen.route) {
+                                                inclusive = true
+                                            }
+                                        }
+                                        1 -> navController.navigate(Screen.SearchScreen.route) {
+                                            popUpTo(Screen.MainScreen.route) {
+                                                inclusive = true
+                                            }
+                                        }
+                                        2 -> navController.navigate(Screen.NewPostScreen.route) {
+                                            popUpTo(Screen.MainScreen.route) {
+                                                inclusive = true
+                                            }
+                                        }
+                                        3 -> navController.navigate(Screen.ShoppingListScreen.route) {
+                                            popUpTo(Screen.MainScreen.route) {
+                                                inclusive = true
+                                            }
+                                        }
+                                        4 -> navController.navigate(Screen.ProfileScreen.route) {
+                                            popUpTo(Screen.MainScreen.route) {
+                                                inclusive = true
+                                            }
+                                        }
+                                    }
+                                },
+                                icon = {
+                                    BadgedBox(
+                                        badge = {
+
+                                        }) {
+                                        Icon(
+                                            imageVector = if (index == selectedItemIndex) {
+                                                item.selectedIcon
+                                            } else item.unselectedIcon,
+                                            contentDescription = item.title
+                                        )
+                                    }
+                                })
+                        }
+                    }
+                }
+            ){
+
+            }
+        }
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun MainScreen(navController: NavController) {
+        Row {
             Text(
-                text = msg.author,
-                color = MaterialTheme.colorScheme.secondary,
-                style = MaterialTheme.typography.titleSmall
+                text = "Home Screen"
             )
-            Spacer(modifier = Modifier.height(4.dp))
+        }
+    }
 
-            Surface(shape = MaterialTheme.shapes.medium,
+    @Composable
+    fun SearchScreen(navController: NavController) {
+        Row {
+            Text(
+                text = "Search"
+            )
+        }
+    }
+
+    @Composable
+    fun NewPostScreen(navController: NavController) {
+        val capturedImage = remember { mutableStateOf<Bitmap?>(null) }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Create a New Post"
+            )
+            if (capturedImage.value != null) {
+                Image(
+                    bitmap = capturedImage.value!!.asImageBitmap(),
+                    contentDescription = "Captured Image"
+                )
+            } else {
+                TextButton(
+                    onClick = {
+                        navController.navigate(Screen.CameraScreen.route)
+                    }
+                ) {
+                    Text(text = "Take a picture")
+                }
+            }
+        }
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun CameraScreen(navController: NavController) {
+        if(!hasRequiredPermissions()) {
+            ActivityCompat.requestPermissions(
+                this, CAMERAX_PERMISSIONS, 0
+            )
+        }
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        val scaffoldState = rememberBottomSheetScaffoldState()
+        val controller = remember {
+            LifecycleCameraController(context).apply {
+                setEnabledUseCases(
+                    CameraController.IMAGE_CAPTURE or
+                            CameraController.VIDEO_CAPTURE
+                )
+            }
+        }
+        val cameraViewModel = viewModel<CameraViewModel>()
+        val bitmaps by cameraViewModel.bitmaps.collectAsState()
+
+        val capturedImage = rememberSaveable { mutableStateOf<Bitmap?>(null) }
+
+        BottomSheetScaffold(
+            scaffoldState = scaffoldState,
+            sheetPeekHeight = 0.dp,
+            sheetContent = {
+                PhotoBottomSheetContent(
+                    bitmaps = bitmaps,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                )
+            }
+        ) { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                CameraPreview(
+                    controller = controller,
+                    modifier = Modifier
+                        .fillMaxSize()
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    IconButton(
+                        onClick = {
+                            scope.launch {
+                                scaffoldState.bottomSheetState.expand()
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Photo,
+                            contentDescription = "Open gallery"
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            takePhoto(
+                                controller = controller,
+                                onPhotoTaken = cameraViewModel::onTakePhoto
+                            )
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoCamera,
+                            contentDescription = "Take photo"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun ShoppingListScreen(navController: NavController) {
+        Row {
+            Text(
+                text = "Shopping List"
+            )
+        }
+    }
+
+    @Composable
+    fun ProfileScreen(navController: NavController) {
+        Row {
+            Text(
+                text = "Profile"
+            )
+            IconButton(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                onClick = {
+                    navController.navigate(Screen.SettingsScreen.route)
+                })
+            {
+                Icon(
+                    imageVector = Icons.Filled.Settings,
+                    contentDescription = "Settings Screen"
+                )
+            }
+        }
+    }
+
+    @Composable
+    fun SettingsScreen(navController: NavController) {
+        var text by remember {
+            mutableStateOf("Username")
+        }
+        var uri by remember {
+            mutableStateOf<Uri?>(null)
+        }
+
+        val singlePhotoPick = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.PickVisualMedia(),
+            onResult = {
+                uri = it
+
+            })
+        Row {
+            IconButton(onClick = {
+                navController.navigate(Screen.ProfileScreen.route) {
+                    popUpTo(Screen.ProfileScreen.route) {
+                        inclusive = true
+                    }
+                }
+            }) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Return to main screen")
+            }
+        }
+        Row (modifier = Modifier
+            .padding(horizontal = 10.dp)
+            .padding(vertical = 50.dp)) {
+            AsyncImage(
+                model = uri,
+                contentDescription = null,
+                error = painterResource(R.drawable.defaultti),
+                modifier = Modifier
+                    .clickable {
+                        singlePhotoPick.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    }
+                    .size(100.dp)
+                    .clip(CircleShape)
+                    .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape))
+        }
+
+        Row (modifier = Modifier
+            .padding(horizontal = 10.dp)
+            .padding(vertical = 160.dp)){
+            TextField(value = text, onValueChange = {
+                text = it
+            })
+
+        }
+    }
+
+    @Composable
+    fun MessageCard(msg: Message) {
+        Row(modifier = Modifier.padding(all = 8.dp)) {
+            Image(painter = painterResource(R.drawable.defaultti),
+                contentDescription = "Contact profile picture",
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape))
+
+            var isExpanded by remember { mutableStateOf(false) }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            val surfaceColor by animateColorAsState(
+                if (isExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                label = "pressed",
+            )
+
+            Column(modifier = Modifier.clickable { isExpanded = !isExpanded }) {
+                Text(
+                    text = msg.author,
+                    color = MaterialTheme.colorScheme.secondary,
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Surface(shape = MaterialTheme.shapes.medium,
                     shadowElevation = 1.dp,
                     color = surfaceColor,
                     modifier = Modifier
                         .animateContentSize()
                         .padding(1.dp)) {
-                Text(
-                    text = msg.body,
-                    modifier = Modifier.padding(all = 4.dp),
-                    maxLines = if (isExpanded) Int.MAX_VALUE else 1,
-                    style = MaterialTheme.typography.bodyMedium
+                    Text(
+                        text = msg.body,
+                        modifier = Modifier.padding(all = 4.dp),
+                        maxLines = if (isExpanded) Int.MAX_VALUE else 1,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+    }
+
+    @Preview(name = "Light Mode")
+    @Preview(
+        uiMode = Configuration.UI_MODE_NIGHT_YES,
+        showBackground = true,
+        name = "Dark Mode"
+    )
+    @Composable
+    fun PreviewMessageCard() {
+        ComposeTutorialTheme {
+            Surface {
+                MessageCard(
+                    msg = Message("Username", "Wow I love creating apps!")
                 )
             }
         }
     }
-}
 
-@Preview(name = "Light Mode")
-@Preview(
-    uiMode = Configuration.UI_MODE_NIGHT_YES,
-    showBackground = true,
-    name = "Dark Mode"
-)
-@Composable
-fun PreviewMessageCard() {
-    ComposeTutorialTheme {
-        Surface {
-            MessageCard(
-                msg = Message("Username", "Wow I love creating apps!")
-            )
+    @Composable
+    fun Conversation(messages: List<Message>) {
+        LazyColumn {
+            items(messages) { message ->
+                MessageCard(message)
+            }
+        }
+    }
+
+    @Preview
+    @Composable
+    fun PreviewConversation() {
+        ComposeTutorialTheme {
+            Conversation(SampleData.conversationSample)
+        }
+    }
+
+    @Composable
+    fun ScrollContent(innerPadding: PaddingValues) {
+        ComposeTutorialTheme {
+            Conversation(SampleData.conversationSample)
         }
     }
 }
 
-@Composable
-fun Conversation(messages: List<Message>) {
-    LazyColumn {
-        items(messages) { message ->
-            MessageCard(message)
-        }
-    }
-}
-
-@Preview
-@Composable
-fun PreviewConversation() {
-    ComposeTutorialTheme {
-        Conversation(SampleData.conversationSample)
-    }
-}
-
-@Composable
-fun ScrollContent(innerPadding: PaddingValues) {
-    ComposeTutorialTheme {
-        Conversation(SampleData.conversationSample)
-    }
-}
